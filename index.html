@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PDF to Word Converter | SaaS Tool</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f5f7fa;
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #333;
+    }
+    .container {
+      background: white;
+      padding: 2.5rem 3rem;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+      width: 360px;
+      text-align: center;
+    }
+    h1 {
+      margin-bottom: 1rem;
+      font-weight: 700;
+      color: #0070f3;
+    }
+    p.description {
+      color: #666;
+      margin-bottom: 2rem;
+      font-size: 0.9rem;
+    }
+    input[type="file"] {
+      display: none;
+    }
+    label.file-label {
+      display: inline-block;
+      background-color: #0070f3;
+      color: white;
+      padding: 0.7rem 1.5rem;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background-color 0.3s ease;
+      margin-bottom: 1.5rem;
+      user-select: none;
+    }
+    label.file-label:hover {
+      background-color: #005bb5;
+    }
+    .file-name {
+      font-size: 0.9rem;
+      color: #555;
+      margin-bottom: 1.5rem;
+      min-height: 1.2rem;
+      word-break: break-word;
+    }
+    button.convert-btn {
+      width: 100%;
+      background-color: #00b894;
+      border: none;
+      padding: 0.8rem 0;
+      font-size: 1rem;
+      color: white;
+      font-weight: 700;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    button.convert-btn:disabled {
+      background-color: #95a5a6;
+      cursor: not-allowed;
+    }
+    button.convert-btn:hover:not(:disabled) {
+      background-color: #019875;
+    }
+    .status {
+      margin-top: 1.5rem;
+      font-size: 0.9rem;
+      min-height: 1.2rem;
+      color: #e74c3c;
+    }
+    .progress-container {
+      display: none;
+      margin-top: 1rem;
+      height: 10px;
+      background-color: #eee;
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background-color: #0070f3;
+      transition: width 0.4s ease;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>PDF to Word Converter</h1>
+    <p class="description">Upload your PDF and convert it instantly to an editable Word document.</p>
+
+    <form id="uploadForm">
+      <label for="pdfInput" class="file-label">Choose PDF File</label>
+      <input type="file" id="pdfInput" name="pdf" accept="application/pdf" required />
+      <div class="file-name" id="fileName"></div>
+
+      <button type="submit" class="convert-btn" disabled>Convert PDF to Word</button>
+    </form>
+
+    <div class="progress-container" id="progressContainer">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <div class="status" id="status"></div>
+  </div>
+
+  <script>
+    const pdfInput = document.getElementById('pdfInput');
+    const fileNameDisplay = document.getElementById('fileName');
+    const convertBtn = document.querySelector('.convert-btn');
+    const status = document.getElementById('status');
+    const form = document.getElementById('uploadForm');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+
+    let originalFileName = '';
+
+    pdfInput.addEventListener('change', () => {
+      if (pdfInput.files.length > 0) {
+        originalFileName = pdfInput.files[0].name.replace(/\.pdf$/i, '');
+        fileNameDisplay.textContent = pdfInput.files[0].name;
+        convertBtn.disabled = false;
+        status.textContent = '';
+      } else {
+        fileNameDisplay.textContent = '';
+        convertBtn.disabled = true;
+      }
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      status.style.color = '#0070f3';
+      status.textContent = 'Uploading and converting...';
+      progressContainer.style.display = 'block';
+      progressBar.style.width = '0%';
+
+      const formData = new FormData();
+      formData.append('pdf', pdfInput.files[0]);
+
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', 'https://pdf-to-word-backend-txap.onrender.com/convert', true);
+
+        xhr.responseType = 'blob';
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = (e.loaded / e.total) * 100;
+            progressBar.style.width = percentComplete + '%';
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            const blob = xhr.response;
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = downloadUrl;
+            a.download = `${originalFileName}.docx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(downloadUrl);
+
+            progressBar.style.width = '100%';
+            status.style.color = 'green';
+            status.textContent = 'Conversion successful! Your download should start.';
+          } else {
+            throw new Error('Conversion failed');
+          }
+        };
+
+        xhr.onerror = () => {
+          throw new Error('Request failed');
+        };
+
+        xhr.send(formData);
+      } catch (error) {
+        progressContainer.style.display = 'none';
+        status.style.color = '#e74c3c';
+        status.textContent = error.message || 'Failed to convert PDF.';
+      }
+    });
+  </script>
+</body>
+</html>
